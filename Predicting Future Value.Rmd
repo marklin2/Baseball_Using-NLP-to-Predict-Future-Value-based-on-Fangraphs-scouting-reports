@@ -1,0 +1,566 @@
+---
+title: "Baseball_Final"
+author: "FP-2"
+date: "03/08/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Cleaning
+
+The first step is to change the data such that we are able to work with it:
+
+```{r}
+setwd("~/Desktop/Columbia/Summer22/5205/Project")
+Stats = read.csv('fangraphs_stats.csv',stringsAsFactors = T)
+Report = read.csv('fangraphs_Report.csv')
+
+colnames(Stats)
+colnames(Report)
+
+#1. Drop out meaningless variables
+library(dplyr)
+Report = select(Report, -Video,-Trend)
+
+#2. Assign NA value
+Stats_na <- Stats
+Stats_na[Stats_na == ""  | Stats_na== " "] <- NA
+
+Report_na <- Report
+Report_na[Report_na == ""  | Report_na== " "] <- NA
+
+#Find out the missing value
+Stats_na1 = colSums(is.na(Stats_na))
+Stats_na1[Stats_na1 > 0]
+Report_na1 = colSums(is.na(Report_na))
+Report_na1[Report_na1 > 0]
+
+#3.remove duplicate Name with dplyr
+Stats_na <- Stats_na %>%
+  distinct(Name,.keep_all = TRUE)
+Stats_na
+Report_na <- Report_na %>% 
+  distinct(Name,.keep_all = TRUE)
+Report_na
+
+#4. Delete Row
+#Delete the row where there is a blank value in Hit/Game/Raw/Spd which is the same person
+Stats1<- Stats_na[-which(is.na(Stats_na$Hit)), ]
+
+#Delete the row where there is a blank value in Report Column
+Report1<- Report_na[-which(is.na(Report_na$Report)), ]
+
+
+
+#5.Additional data treatment
+Stats2 <- Stats1
+Report2 <- Report1
+#Current.Level
+Report2$Current.Level[Report2$Current.Level=="-1"] <-"A"
+Report2$Current.Level[is.na(Report2$Current.Level)] <-"Injured"
+table(Report2$Current.Level)
+
+#Top100- assign 0 to blank value, means he is out of top100
+Stats2$Top.100[is.na(Stats2$Top.100)] <- 0
+Report2$Top.100[is.na(Report2$Top.100)] <- 0
+
+
+#playerId
+Report2$playerId[is.na(Report2$playerId)] <- 0000
+
+#Bonus
+Report2$Bonus[is.na(Report2$Bonus)] <- 0
+
+#Height, convert from inches to cm
+Report2.2 <- Report2
+Report2.2 <- Report2.2 %>% 
+  separate(Ht, into = c("H1", "H2"), convert = TRUE) %>%
+  mutate(H1 = H1 * 30.48 , H2 = H2 * 2.54) %>%
+  mutate(Ht_cm = H1+H2)
+Report2.2 = select(Report2.2, -H1, -H2)
+
+
+#Hit/Game/Raw/Spd
+library(stringr)
+Stats2 <- Stats2 %>%
+   separate(Hit, into = c("Present_Hit", "Future_Hit", sep = '//')) 
+ 
+Stats2 <- Stats2 %>%
+   separate(Game, into = c("Present_Game", "Future_Game", sep = '//')) 
+
+Stats2 <- Stats2 %>%
+   separate(Raw, into = c("Present_Raw", "Future_Raw", sep = '//'))
+Stats2 <- Stats2 %>%
+   separate(Spd, into = c("Present_Spd", "Future_Spd", sep = '//'))
+#Drop out the unnecessary column 
+Stats2 = select(Stats2, -"//")
+
+#Name Separate into First Name and Last Name 
+Stats3 <- Stats2
+Stats3 <- Stats3 %>%
+  separate(Name, into = c("First_Name", "Last_Name","Last_name_1", sep = ' ')) %>%
+  mutate(Last_Name = paste(Last_Name, Last_name_1))
+
+Stats3 <- Stats3 %>%
+  mutate(Last_Name = gsub('NA', '', Stats3$Last_Name)) %>%
+  select(-Last_name_1,-" ")
+
+Report3 <- Report2.2
+Report3 <- Report3 %>%
+  separate(Name, into = c("First_Name", "Last_Name","Last_name_1", sep = ' ')) %>%
+  mutate(Last_Name = paste(Last_Name, Last_name_1))
+ 
+Report3 <- Report3 %>%
+  mutate(Last_Name = gsub('NA', '', Report3$Last_Name)) %>%
+  select(-Last_name_1,-" ")
+
+
+#6. Convert the rest character variables to factor
+colnames(Report3)
+colnames(Stats3)
+summary(Stats3)
+summary(Report3)
+Report3$First_Name <- as.factor(Report3$First_Name)
+Report3$Last_Name <- as.factor(Report3$Last_Name)
+Report3$Pos <- as.factor(Report3$Pos)
+Report3$Current.Level <- as.factor(Report3$Current.Level)
+Report3$FV <- as.factor(Report3$FV)
+Report3$Risk<- as.factor(Report3$Risk)
+Report3$B <- as.factor(Report3$B)
+Report3$T <- as.factor(Report3$T)
+Report3$Sign.Mkt <- as.factor(Report3$Sign.Mkt)
+Report3$Sign.Org <- as.factor(Report3$Sign.Org)
+Report3$Signed.From <- as.factor(Report3$Signed.From)
+Report3$Report <-as.factor(Report3$Report)
+
+Stats3$First_Name <- as.factor(Stats3$First_Name)
+Stats3$Last_Name <- as.factor(Stats3$Last_Name)
+Stats3$Org <- as.factor(Stats3$Org)
+Stats3$Pos <- as.factor(Stats3$Pos)
+Stats3$Current.Level <- as.factor(Stats3$Current.Level)
+Stats3$Age <- as.factor(Stats3$Age)
+Stats3$Present_Hit <- as.factor(Stats3$Present_Hit)
+Stats3$Future_Hit <- as.factor(Stats3$Future_Hit)
+Stats3$Present_Raw <- as.factor(Stats3$Present_Raw)
+Stats3$Future_Raw <- as.factor(Stats3$Future_Raw)
+Stats3$Present_Game <- as.factor(Stats3$Present_Raw)
+Stats3$Future_Game <- as.factor(Stats3$Future_Raw)
+Stats3$FV <- as.factor(Stats3$Present_Raw)
+Stats3$Present_Spd <- as.factor(Stats3$Future_Raw)
+Stats3$Future_Spd <- as.factor(Stats3$Future_Raw)
+
+write.csv(Report3, 'Cleaned_Report_dataset.csv', row.names = F)
+
+write.csv(Stats3,'Cleaned_Stats_dataset.csv', row.names = F)
+
+
+```
+
+Now that the clean version of the data is written, the analysis can begin
+
+# Making the dictionary
+
+install.packages("NLP") The first step is to take the cleaned dataset from the proposal, drop all of the non-report column, and go through the corpus-making process:
+
+```{r}
+#Read the data
+data = read.csv("Cleaned_Report_dataset.csv")
+
+#Drop all non-report columns
+data_report = subset(data, select = c(Report, FV))
+
+#Create a corpus
+library(tm)
+data_corpus = Corpus(VectorSource(data_report$Report))
+
+#Cleaned Corpus
+library(dplyr)
+data_corpus_cleaned <- data_corpus %>%
+  tm_map(FUN = content_transformer(tolower)) %>%
+  tm_map(FUN = content_transformer(
+    FUN = function(x)gsub(pattern = 'http[[:alnum:][:punct:]]*', 
+                          replacement = ' ',x = x
+  ))
+  )%>%
+  tm_map(FUN = removePunctuation) %>%
+  tm_map(FUN = removeWords , c(stopwords("english"))) %>%
+  tm_map(FUN = stripWhitespace)
+```
+
+Once the corpus is cleaned, we can go on to use it as the basis for a document term matrix:
+
+```{r}
+#Create the dtm
+dtm = DocumentTermMatrix(data_corpus_cleaned)
+
+#Remove sparse terms
+xdtm = removeSparseTerms(dtm , sparse = 0.95)
+
+#Turn into a df
+xdtm = as.data.frame(as.matrix(xdtm))
+
+```
+
+Now we just need to format the dataframe to be used as a dictionary for sentiment analysis:
+
+```{r}
+#Flip columns and rows:
+#dictionary = as.data.frame(t(xdtm))
+
+#sum
+dict_sum = as.data.frame(colSums(xdtm))
+
+#Write csv
+write.csv(x = dict_sum , file = "dictionary.csv")
+```
+
+Now that we have all the words to consider, the work will be to determine thanks to expert research & industry knowledge which are positive, and which are negative. This will be manual work, but once it is complete, we will be able to apply it back to the reports
+
+# Apply the Customized Dictionary for Sentiment Analysis
+
+Now that we have a customized dictionary, we supplement it with the Afinn dataset, clean it, and bind it with the rest of our data:
+
+```{r}
+library(dplyr)
+data = read.csv("Cleaned_Report_dataset.csv")
+#Drop all non-report columns
+data_report = subset(data, select = c(Report, FV))
+data2 = read.csv("dictionary_updated.csv", fileEncoding="UTF-8-BOM")
+data2_lexicon_short = data2 %>% select(word, value )
+
+#clean the dictionary: Remove 0s
+data2_lexicon_short <- data2_lexicon_short %>%
+  filter(
+    value != 0
+  )
+
+#Append the afinn dataset to the lexicon to make it better
+library(tidytext)
+afinn = read.table('https://raw.githubusercontent.com/pseudorational/data/master/AFINN-111.txt',
+                   header = F,
+                   quote="",
+                   sep = '\t',
+                   col.names = c('word','value'), 
+                   encoding='UTF-8',
+                   stringsAsFactors = F)
+
+#Remove any word in afinn already present in the created dictionary "data2_lexicon"
+afinn_filtered <- afinn %>%
+  filter(
+    word != data2_lexicon_short$word
+  ) %>% 
+  #change the values in afinn to match the values in lexicon
+  mutate(
+    value_adjusted = ifelse(
+      value > 0 , 1 , -1)
+    ) %>% 
+  #drop the original value column
+  subset(select = -c(2))
+
+#match the column names
+colnames(afinn_filtered) <- colnames(data2_lexicon_short)
+
+#append afinn_filtered to the bottom of our created dictionary "data2_lexicon"
+data2_lexicon <- rbind(data2_lexicon_short , afinn_filtered)
+
+#Add an ID column to data_report
+library(tidyverse)
+data_report_ID = tibble::rowid_to_column(data_report, "ID")
+```
+
+Visualize text to capture display the most prominent or frequent words in reviews,give the non-technical audiences a general understanding:
+
+```{r}
+#Word Could 
+install.packages("wordcloud")
+library(wordcloud)
+wordcloudData = 
+  data_report_ID%>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  ungroup()%>%
+  select(ID,word)%>%
+  anti_join(stop_words)%>%
+  group_by(word)%>%
+  summarize(freq = n())%>%
+  arrange(desc(freq))%>%
+  ungroup()%>%
+  data.frame()
+
+
+library(wordcloud)
+set.seed(617)
+wordcloud(words = wordcloudData$word,wordcloudData$freq,scale=c(2,0.5),max.words = 100,colors=brewer.pal(9,"Spectral"))
+```
+
+```{r}
+#Comparison Cloud by the afinn
+library(tidyr)
+wordcloudData = 
+  data_report_ID%>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  ungroup()%>%
+  select(ID,word)%>%
+  anti_join(stop_words)%>%
+  inner_join(get_sentiments('bing'))%>%
+  ungroup()%>%
+  count(sentiment,word,sort=T)%>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0)%>%
+  data.frame()
+rownames(wordcloudData) = wordcloudData[,'word']
+wordcloudData = wordcloudData[,c('positive','negative')]
+set.seed(617)
+comparison.cloud(term.matrix = wordcloudData,scale = c(2,0.5),max.words = 100, rot.per=0)
+```
+
+```{r}
+#Inner joining customized Dictionary after assigning values from expert knowledge
+library(tidytext)
+library(ggplot2)
+#Summary 
+data_report_ID %>%
+  select(ID,Report)%>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  inner_join(data2_lexicon)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  summarize(min=min(reviewSentiment),
+            max=max(reviewSentiment),
+            median=median(reviewSentiment),
+            mean=mean(reviewSentiment))
+
+#Distribution of reviewsentiment 
+data_report_ID %>%
+  select(ID,Report)%>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  inner_join(data2_lexicon)%>%
+  summarize(reviewSentiment = mean(value))%>%
+  ungroup()%>%
+  ggplot(aes(x=reviewSentiment,fill=reviewSentiment>0))+
+  geom_histogram(binwidth = 0.1)+
+  scale_x_continuous(breaks=seq(-5,5,1))+
+  scale_fill_manual(values=c('tomato','seagreen'))+
+  guides(fill=F)
+```
+
+```{r}
+#Determine the sentiment of reviews
+analysis_data = data_report_ID %>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  inner_join(data2_lexicon)%>%
+  summarize(reviewSentiment = mean(value))
+
+#Add review sentiment to analysis_data
+analysis_data$reviewSentiment<-scale(analysis_data$reviewSentiment)
+data_fv$FV = scale(as.numeric(data_fv$FV))
+```
+
+```{r}
+data_fv = data %>% select(FV)
+data_fv$FV <- gsub('\\D','', data_fv$FV) 
+data_fv2 = tibble::rowid_to_column(data_fv, "ID")
+data_fv = data_fv2
+```
+
+```{r}
+#Distribution of FV
+df<-data_fv %>% left_join(analysis_data, by="ID")
+row.names(df)<-df$ID
+df<-df %>% select("FV","reviewSentiment")
+
+df$FV<-as.numeric(df$FV)
+df$reviewSentiment<-as.numeric(df$reviewSentiment)
+df<-as.data.frame(df)
+
+df
+
+ggplot(df,aes(x=FV))+
+  geom_histogram(binwidth = 2)+
+  scale_x_continuous(breaks=seq(30,75,5))
+
+
+```
+
+Finally, we try to test the consistency between the FV and the review sentiment:
+
+```{r}
+#Test consistency
+library(ggpubr)
+e<-ggscatter(df, x = "FV", y = "reviewSentiment", 
+             add = "reg.line", conf.int = TRUE, 
+             cor.coef = TRUE, cor.method = "pearson")
+e
+
+
+```
+
+```{r}
+#Normalizing FV
+df_FV_scale = df
+df_FV_scale$FV <- scale(df$FV, center = FALSE)
+
+#Try with normalized FV
+f<-ggscatter(df_FV_scale, x = "FV", y = "reviewSentiment", 
+             add = "reg.line", conf.int = TRUE, 
+             cor.coef = TRUE, cor.method = "pearson")
+f
+
+#This is a bust
+```
+
+```{r}
+#Use clustering to seperate players based on reviews
+d = dist(x = analysis_data,method = 'euclidean') 
+clusters = hclust(d = d,method='ward.D2')
+set.seed(617)
+km = kmeans(x = analysis_data,centers = 3,iter.max=10000)
+table(km$cluster)
+```
+
+```{r}
+#Filtering by cluster
+df_with_cluster = cbind(df , km$cluster)
+
+#Rewrite the colnames to be sensible
+colnames(df_with_cluster) <- c("FV" , "Review_Sentiment" , "Cluster")
+
+#cast cluster as char
+df_with_cluster$Cluster <- as.character(df_with_cluster$Cluster)
+
+#df_with_cluster_scaled
+df_with_cluster_scaled = df_with_cluster
+df_with_cluster_scaled$FV = scale(df_with_cluster$FV , center = TRUE)
+df_with_cluster_scaled$Review_Sentiment = scale(df_with_cluster$Review_Sentiment , center = TRUE)
+
+#Visualize
+ggplot(df_with_cluster_scaled,
+       aes(y=Review_Sentiment,
+           x=FV,
+           col=Cluster)
+       )+
+  geom_point()
+  
+```
+
+```{r}
+#Sort players by FV
+df_cluster_sorted = df_with_cluster_scaled
+df_cluster_sorted$FV <- sort(
+    df_cluster_sorted$FV , decreasing = TRUE
+  )
+```
+
+```{r}
+#filter by nrow
+df_sorted_top <- df_cluster_sorted %>%
+  head(200)
+
+#Try the fitting again
+g<-ggscatter(df_sorted_top, x = "FV", y = "Review_Sentiment", 
+             add = "reg.line", conf.int = TRUE, 
+             cor.coef = TRUE, cor.method = "pearson")
+g
+```
+
+```{r}
+#filter by nrow
+df_sorted_btm <- df_cluster_sorted %>%
+  tail(400)
+
+#Try the fitting again
+h<-ggscatter(df_sorted_btm, x = "FV", y = "Review_Sentiment", 
+             add = "reg.line", conf.int = TRUE, 
+             cor.coef = TRUE, cor.method = "pearson")
+h
+```
+
+#distribution of rs by each FV
+
+```{r}
+#reviewsentiment by each FV
+
+df_FV35<-df[which(df$FV==35),]
+ggplot(df_FV35,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV40<-df[which(df$FV==40),]
+ggplot(df_FV40,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV45<-df[which(df$FV==45),]
+ggplot(df_FV45,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV50<-df[which(df$FV==50),]
+ggplot(df_FV50,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV55<-df[which(df$FV==55),]
+ggplot(df_FV55,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV60<-df[which(df$FV==60),]
+ggplot(df_FV60,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV65<-df[which(df$FV==65),]
+ggplot(df_FV65,aes(x=reviewSentiment))+
+  geom_histogram()
+
+df_FV70<-df[which(df$FV==70),]
+ggplot(df_FV70,aes(x=reviewSentiment))+
+  geom_histogram()
+```
+
+#Visualize text to capture display the most prominent or frequent words in reviews,give the non-technical audiences a general understanding
+
+```{r}
+#Word Could 
+install.packages("wordcloud")
+library(wordcloud)
+wordcloudData = 
+  data_report_ID%>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  ungroup()%>%
+  select(ID,word)%>%
+  anti_join(stop_words)%>%
+  group_by(word)%>%
+  summarize(freq = n())%>%
+  arrange(desc(freq))%>%
+  ungroup()%>%
+  data.frame()
+
+
+library(wordcloud)
+set.seed(617)
+wordcloud(words = wordcloudData$word,wordcloudData$freq,scale=c(2,0.5),max.words = 100,colors=brewer.pal(9,"Spectral"))
+```
+
+```{r}
+#Comparison Cloud by the afinn
+library(tidyr)
+wordcloudData = 
+  data_report_ID%>%
+  group_by(ID)%>%
+  unnest_tokens(output=word,input=Report)%>%
+  ungroup()%>%
+  select(ID,word)%>%
+  anti_join(stop_words)%>%
+  inner_join(get_sentiments('bing'))%>%
+  ungroup()%>%
+  count(sentiment,word,sort=T)%>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0)%>%
+  data.frame()
+rownames(wordcloudData) = wordcloudData[,'word']
+wordcloudData = wordcloudData[,c('positive','negative')]
+set.seed(617)
+comparison.cloud(term.matrix = wordcloudData,scale = c(2,0.5),max.words = 100, rot.per=0)
+```
